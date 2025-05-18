@@ -14,7 +14,7 @@ subdirectory (similar to how GPU vendors are supported today).
 Build it like a normal Triton, but just pass TRITON_SPIRV_BACKEND=1 to use the SPIRV backend over a GPU backend, if any.
 
 ```bash
-TRITON_SPIRV_BACKEND=1 python python/tutorials/01-vector-add.py
+TRITON_SPIRV_BACKEND=1 python python/tutorials/spirv_demo/01-vector-add.py
 ```
 
 

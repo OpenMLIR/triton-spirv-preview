@@ -9,7 +9,7 @@
 
 ## 项目编译
 
-由于我需要看MLIR的源码实现，所以这里`clone`了`llvm/llvm-project`，只安装的话`setup.py`会帮你自动下载的，第二块可以忽略。
+由于我需要看MLIR的源码实现，所以这里`clone`了`llvm/llvm-project`，只安装的话`setup.py`会帮你自动下载的，第二块可以忽略，下载好本项目直接`pip install -e .`即可。
 
 ```bash
 # 克隆 本项目
@@ -21,7 +21,7 @@ cat cmake/llvm-hash.txt
 
 cd ~
 # 克隆LLVM
-git clone https://github.com/llvm/llvm-project
+git clone https://github.com/llvm/llvm-project.git
 # 切换到 cat 出的依赖的LLVM版本
 git checkout a66376b0dc3b2ea8a84fda26faca287980986f78
 mkdir build;cd build
@@ -35,6 +35,8 @@ export LLVM_BUILD_DIR=~/llvm-project/build
 cd <triton install>
 # 设置debug模式，可选
 export DEBUG=1
+# build-time dependencies
+pip install -r python/requirements.txt
 # 调用 setup.py 安装，使用 --no-build-isolation 可以加快编译速度
 LLVM_INCLUDE_DIRS=$LLVM_BUILD_DIR/include \
   LLVM_LIBRARY_DIR=$LLVM_BUILD_DIR/lib \
