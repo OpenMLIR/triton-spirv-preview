@@ -1,5 +1,7 @@
 # Triton-SPIRV
 
+> Chinese Documentation - [中文文档](./README-ZH.md)
+
 A toy development branch to build an experimental SPIRV backend for [Triton](https://github.com/openai/triton). It is heavily inspired by [triton-lang/triton-cpu](https://github.com/triton-lang/triton-cpu) and [microsoft/triton-shared](https://github.com/microsoft/triton-shared).
 
 This repository clones the main Triton repository, but we intend to minimize
@@ -11,7 +13,7 @@ subdirectory (similar to how GPU vendors are supported today).
 
 Build it like a normal Triton, but just pass TRITON_SPIRV_BACKEND=1 to use the SPIRV backend over a GPU backend, if any.
 
-```
+```bash
 TRITON_SPIRV_BACKEND=1 python python/tutorials/01-vector-add.py
 ```
 
