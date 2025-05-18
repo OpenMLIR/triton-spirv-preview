@@ -7,7 +7,7 @@
 本项目参考和拷贝了[triton-lang/triton-cpu](https://github.com/triton-lang/triton-cpu) 和 [microsoft/triton-shared](https://github.com/microsoft/triton-shared) 的大部份代码，目标是提供一个接入`Triton`的样本，完成`tutorials`的适配，大概率是个`Toy`。并跑在`Nvidia`的卡上，目标达到仅使用`CUDA CORE`的`Kernel`性能的`50%`及以上。
 
 
-## 项目编译
+## 项目编译和安装
 
 由于我需要看MLIR的源码实现，所以这里`clone`了`llvm/llvm-project`，只安装的话`setup.py`会帮你自动下载的，第二块可以忽略，下载好本项目直接`pip install -e .`即可。
 
@@ -17,13 +17,13 @@ git clone https://github.com/OpenMLIR/triton-spirv.git
 cd triton-spirv
 # 查看其依赖的LLVM版本
 cat cmake/llvm-hash.txt
-# 依赖LLVM版本号为a66376b0dc3b2ea8a84fda26faca287980986f78
+# 依赖LLVM版本号为3c709802d31b5bc5ed3af8284b40593ff39b9eec
 
 cd ~
 # 克隆LLVM
 git clone https://github.com/llvm/llvm-project.git
 # 切换到 cat 出的依赖的LLVM版本
-git checkout a66376b0dc3b2ea8a84fda26faca287980986f78
+git checkout 3c709802d31b5bc5ed3af8284b40593ff39b9eec
 mkdir build;cd build
 # 设置CMake 参数
 cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_ASSERTIONS=ON ../llvm -DLLVM_ENABLE_PROJECTS="mlir;llvm" -DLLVM_TARGETS_TO_BUILD="host;NVPTX;AMDGPU"
