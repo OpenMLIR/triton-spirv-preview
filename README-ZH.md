@@ -26,7 +26,7 @@ git clone https://github.com/llvm/llvm-project.git
 git checkout 3c709802d31b5bc5ed3af8284b40593ff39b9eec
 mkdir build;cd build
 # 设置CMake 参数
-cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_ASSERTIONS=ON ../llvm -DLLVM_ENABLE_PROJECTS="mlir;llvm" -DLLVM_TARGETS_TO_BUILD="host;NVPTX;AMDGPU"
+cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_ASSERTIONS=ON ../llvm -DLLVM_ENABLE_PROJECTS="mlir;llvm;lld" -DLLVM_TARGETS_TO_BUILD="host;NVPTX;AMDGPU"
 # 编译LLVM，需要蛮久的
 ninja
 export LLVM_BUILD_DIR=~/llvm-project/build
@@ -50,7 +50,7 @@ LLVM_INCLUDE_DIRS=$LLVM_BUILD_DIR/include \
 仅需要添加`TRITON_SPIRV_BACKEND=1`做为环境变量，即可使用本后端
 
 ```bash
-TRITON_SPIRV_BACKEND=1 python python/tutorials/01-vector-add.py
+TRITON_SPIRV_BACKEND=1 python python/tutorials/spirv_demo/01-vector-add.py
 ```
 
 ## 里程碑
