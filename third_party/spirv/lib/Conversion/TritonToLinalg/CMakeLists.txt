@@ -6,5 +6,6 @@ add_triton_library(TritonToLinalg
 
   LINK_LIBS PUBLIC
   MLIRPass
+  MLIRLinalgTransforms
   TritonSharedAnalysis
 )

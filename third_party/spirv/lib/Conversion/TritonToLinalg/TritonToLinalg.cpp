@@ -127,6 +127,7 @@ struct TritonToLinalg
 
     // Erase dead code and fold constants created during lowering
     PassManager pm(&getContext(), moduleOp.getOperationName());
+    pm.addPass(createCSEPass());
     pm.addPass(createCanonicalizerPass());
     if (failed(runPipeline(pm, getOperation()))) {
       signalPassFailure();
