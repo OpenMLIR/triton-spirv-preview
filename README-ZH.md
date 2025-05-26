@@ -17,6 +17,12 @@
 TRITON_SPIRV_BACKEND=1 python python/tutorials/spirv_demo/01-vector-add.py
 ```
 
+如已编译`spu-opt`，可以运行下面的命令来执行单个/多个 Pass
+
+```bash
+build-opt/third_party/spirv/tool/spirv-opt third_party/spirv/test/add_kernel.ttir  --triton-to-linalg
+```
+
 ## 里程碑
 
 ### 2025.5.17
@@ -55,7 +61,7 @@ cd ~
 git clone https://github.com/llvm/llvm-project.git
 # 切换到 cat 出的依赖的LLVM版本
 git checkout 3c709802d31b5bc5ed3af8284b40593ff39b9eec
-mkdir build;cd build
+mkdir build; cd build
 # 设置CMake 参数
 cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_ASSERTIONS=ON ../llvm -DLLVM_ENABLE_PROJECTS="mlir;llvm;lld" -DLLVM_TARGETS_TO_BUILD="host;NVPTX;AMDGPU"
 # 编译LLVM，需要蛮久的
@@ -73,6 +79,15 @@ LLVM_INCLUDE_DIRS=$LLVM_BUILD_DIR/include \
   LLVM_LIBRARY_DIR=$LLVM_BUILD_DIR/lib \
   LLVM_SYSPATH=$LLVM_BUILD_DIR \
   pip install -e .
+```
+
+## 编译 spirv-opt 方便调试
+
+提供了`BUILD_SPIRV_OPT`选项来控制是否编译二进制的命令行工具。
+
+```bash
+mkdir build-opt; cd build-opt
+cmake -G Ninja .. -DLLVM_INCLUDE_DIRS=$LLVM_BUILD_DIR/include  -DLLVM_LIBRARY_DIR=$LLVM_BUILD_DIR/lib -DTRITON_CODEGEN_BACKENDS="nvidia;amd;spirv" -DCMAKE_BUILD_TYPE=Debug -DBUILD_SPIRV_OPT=ON
 ```
 
 ---
