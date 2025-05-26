@@ -125,6 +125,36 @@ struct TritonToLinalg
     if (failed(applyPartialConversion(moduleOp, target, std::move(patterns))))
       signalPassFailure();
 
+    // Convert tt.func and tt.return into func's counterparts
+    moduleOp.walk([&](triton::FuncOp func) {
+      OpBuilder builder(func);
+
+      auto name = func.getName();
+      auto type = func.getFunctionType();
+
+      SmallVector<DictionaryAttr> argAttrs, resAttrs;
+      func.getAllArgAttrs(argAttrs);
+      func.getAllResultAttrs(resAttrs);
+
+      auto funcFunc = builder.create<func::FuncOp>(func.getLoc(), name, type);
+      funcFunc.setAllArgAttrs(argAttrs);
+      funcFunc.setAllResultAttrs(resAttrs);
+
+      auto &funcFuncBody = funcFunc.getBody();
+      auto &funcBody = func.getBody();
+
+      IRMapping map;
+      funcBody.cloneInto(&funcFuncBody, map);
+
+      for (Block &block : funcFuncBody.getBlocks()) {
+        auto term = block.getTerminator();
+        builder.setInsertionPoint(term);
+        builder.create<func::ReturnOp>(func.getLoc(), term->getOperands());
+        term->erase();
+      }
+      func.erase();
+    });
+
     // Erase dead code and fold constants created during lowering
     PassManager pm(&getContext(), moduleOp.getOperationName());
     pm.addPass(createCSEPass());
