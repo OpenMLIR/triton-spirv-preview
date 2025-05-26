@@ -111,7 +111,7 @@ struct TritonToLinalg
           if (isa<arith::ConstantOp>(op)) {
             return true;
           }
-          return true;
+
           bool operateOnTensors =
               llvm::all_of(op->getOperandTypes(), [](Type type) {
                 return isa<RankedTensorType>(type);

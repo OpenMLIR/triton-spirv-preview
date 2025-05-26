@@ -1,4 +1,7 @@
 #loc = loc("/home/ubuntu/triton-spirv/python/tutorials/spirv_demo/01-vector-add.py":29:0)
+#loc5 = loc("/home/ubuntu/triton-spirv/python/tutorials/spirv_demo/01-vector-add.py":49:16)
+#loc7 = loc("/home/ubuntu/triton-spirv/python/tutorials/spirv_demo/01-vector-add.py":50:16)
+#map = affine_map<(d0) -> (d0)>
 module {
   func.func @add_kernel(%arg0: memref<*xf32> {tt.divisibility = 16 : i32} loc("/home/ubuntu/triton-spirv/python/tutorials/spirv_demo/01-vector-add.py":29:0), %arg1: memref<*xf32> {tt.divisibility = 16 : i32} loc("/home/ubuntu/triton-spirv/python/tutorials/spirv_demo/01-vector-add.py":29:0), %arg2: memref<*xf32> {tt.divisibility = 16 : i32} loc("/home/ubuntu/triton-spirv/python/tutorials/spirv_demo/01-vector-add.py":29:0), %arg3: i32 {tt.divisibility = 16 : i32} loc("/home/ubuntu/triton-spirv/python/tutorials/spirv_demo/01-vector-add.py":29:0)) {
     %c1024 = arith.constant 1024 : index loc(#loc1)
@@ -23,7 +26,11 @@ module {
     %subview_4 = memref.subview %alloc_2[0] [%7] [1] : memref<1024xf32> to memref<?xf32, strided<[1]>> loc(#loc7)
     memref.copy %subview_3, %subview_4 : memref<?xf32, strided<[1], offset: ?>> to memref<?xf32, strided<[1]>> loc(#loc7)
     %9 = bufferization.to_tensor %alloc_2 restrict writable : memref<1024xf32> to tensor<1024xf32> loc(#loc7)
-    %10 = arith.addf %8, %9 : tensor<1024xf32> loc(#loc8)
+    %10 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel"]} ins(%8, %9 : tensor<1024xf32>, tensor<1024xf32>) outs(%8 : tensor<1024xf32>) {
+    ^bb0(%in: f32 loc("/home/ubuntu/triton-spirv/python/tutorials/spirv_demo/01-vector-add.py":49:16), %in_7: f32 loc("/home/ubuntu/triton-spirv/python/tutorials/spirv_demo/01-vector-add.py":50:16), %out: f32 loc("/home/ubuntu/triton-spirv/python/tutorials/spirv_demo/01-vector-add.py":49:16)):
+      %11 = arith.addf %in, %in_7 : f32 loc(#loc8)
+      linalg.yield %11 : f32 loc(#loc8)
+    } -> tensor<1024xf32> loc(#loc8)
     %reinterpret_cast_5 = memref.reinterpret_cast %arg2 to offset: [%2], sizes: [1024], strides: [1] : memref<*xf32> to memref<1024xf32, strided<[1], offset: ?>> loc(#loc9)
     %extracted_slice = tensor.extract_slice %10[0] [%7] [1] : tensor<1024xf32> to tensor<?xf32> loc(#loc10)
     %subview_6 = memref.subview %reinterpret_cast_5[0] [%7] [1] : memref<1024xf32, strided<[1], offset: ?>> to memref<?xf32, strided<[1], offset: ?>> loc(#loc10)
@@ -35,9 +42,7 @@ module {
 #loc2 = loc("/home/ubuntu/triton-spirv/python/tutorials/spirv_demo/01-vector-add.py":38:24)
 #loc3 = loc("/home/ubuntu/triton-spirv/python/tutorials/spirv_demo/01-vector-add.py":43:24)
 #loc4 = loc("/home/ubuntu/triton-spirv/python/tutorials/spirv_demo/01-vector-add.py":49:24)
-#loc5 = loc("/home/ubuntu/triton-spirv/python/tutorials/spirv_demo/01-vector-add.py":49:16)
 #loc6 = loc("/home/ubuntu/triton-spirv/python/tutorials/spirv_demo/01-vector-add.py":50:24)
-#loc7 = loc("/home/ubuntu/triton-spirv/python/tutorials/spirv_demo/01-vector-add.py":50:16)
 #loc8 = loc("/home/ubuntu/triton-spirv/python/tutorials/spirv_demo/01-vector-add.py":51:17)
 #loc9 = loc("/home/ubuntu/triton-spirv/python/tutorials/spirv_demo/01-vector-add.py":53:26)
 #loc10 = loc("/home/ubuntu/triton-spirv/python/tutorials/spirv_demo/01-vector-add.py":53:35)
