@@ -1,3 +1,7 @@
+#include "mlir/Dialect/Arith/Transforms/BufferizableOpInterfaceImpl.h"
+#include "mlir/Dialect/Bufferization/Transforms/FuncBufferizableOpInterfaceImpl.h"
+#include "mlir/Dialect/Linalg/Transforms/BufferizableOpInterfaceImpl.h"
+#include "mlir/Dialect/Tensor/Transforms/BufferizableOpInterfaceImpl.h"
 #include "spirv/include/Conversion/TritonToLinalg/Passes.h"
 
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
@@ -22,6 +26,12 @@ int main(int argc, char **argv) {
                   mlir::func::FuncDialect, mlir::tensor::TensorDialect,
                   mlir::bufferization::BufferizationDialect,
                   mlir::memref::MemRefDialect>();
+
+  mlir::bufferization::func_ext::registerBufferizableOpInterfaceExternalModels(
+      registry);
+  mlir::arith::registerBufferizableOpInterfaceExternalModels(registry);
+  mlir::linalg::registerBufferizableOpInterfaceExternalModels(registry);
+  mlir::tensor::registerBufferizableOpInterfaceExternalModels(registry);
 
   return mlir::asMainReturnCode(
       mlir::MlirOptMain(argc, argv, "spirv-opt test driver\n", registry));
