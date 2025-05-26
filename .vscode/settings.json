@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "*.ttir": "mlir",
+        "*.lair": "mlir"
+    }
+}
