@@ -27,6 +27,7 @@ void populateTritonToLinalgConversionPatterns(TypeConverter &typeConverter,
   patterns.add<MetaOpConverter>(patterns.getContext());
   patterns.add<StoreConverter>(patterns.getContext());
   patterns.add<LegacyAddPtrConverter>(patterns.getContext());
+  patterns.add<GetProgramIDConverter>(patterns.getContext());
   patterns.add<LoadConverter>(patterns.getContext());
   patterns.add<SplatConverter>(patterns.getContext());
   linalg::populateElementwiseToLinalgConversionPatterns(patterns);
@@ -58,7 +59,7 @@ struct TritonToLinalg
         .insert<func::FuncDialect, arith::ArithDialect, math::MathDialect,
                 linalg::LinalgDialect, affine::AffineDialect, scf::SCFDialect,
                 tensor::TensorDialect, bufferization::BufferizationDialect,
-                memref::MemRefDialect>();
+                memref::MemRefDialect, ::mlir::gpu::GPUDialect>();
   }
 
   void runOnOperation() override {
@@ -74,11 +75,14 @@ struct TritonToLinalg
     ConversionTarget target(getContext());
     TritonTypeConverter tritonTypeConverter;
 
-    target.addLegalDialect<
-        func::FuncDialect, arith::ArithDialect, math::MathDialect,
-        linalg::LinalgDialect, affine::AffineDialect, scf::SCFDialect,
-        cf::ControlFlowDialect, tensor::TensorDialect,
-        bufferization::BufferizationDialect, memref::MemRefDialect>();
+    target.addLegalDialect<func::FuncDialect, arith::ArithDialect,
+                           math::MathDialect, linalg::LinalgDialect,
+                           affine::AffineDialect, scf::SCFDialect,
+                           cf::ControlFlowDialect, tensor::TensorDialect,
+                           bufferization::BufferizationDialect,
+                           memref::MemRefDialect, ::mlir::gpu::GPUDialect>();
+
+    target.addIllegalOp<triton::GetProgramIdOp>();
 
     target.addLegalOp<ModuleOp>();
 

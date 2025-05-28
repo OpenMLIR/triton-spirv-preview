@@ -11,6 +11,8 @@
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
+
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 
@@ -450,6 +452,28 @@ struct SplatConverter : public OpConversionPattern<triton::SplatOp> {
             .result();
 
     rewriter.replaceOp(op, filledTensor);
+    return success();
+  }
+};
+
+struct GetProgramIDConverter
+    : public OpConversionPattern<triton::GetProgramIdOp> {
+  using OpConversionPattern<triton::GetProgramIdOp>::OpConversionPattern;
+
+public:
+  LogicalResult
+  matchAndRewrite(triton::GetProgramIdOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto axis = (uint32_t)op.getAxis();
+    auto loc = op.getLoc();
+    auto i32_ty = rewriter.getIntegerType(32);
+
+    static constexpr mlir::gpu::Dimension dims[] = {mlir::gpu::Dimension::x,
+                                                    mlir::gpu::Dimension::y,
+                                                    mlir::gpu::Dimension::z};
+    auto blockId = rewriter.create<::mlir::gpu::BlockIdOp>(loc, dims[axis]);
+    auto id = rewriter.create<arith::IndexCastOp>(loc, i32_ty, blockId);
+    rewriter.replaceOp(op, id);
     return success();
   }
 };
