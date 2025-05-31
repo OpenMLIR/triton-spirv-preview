@@ -14,6 +14,8 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/InitAllPasses.h"
 #include "triton/Dialect/Triton/IR/Dialect.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 
 int main(int argc, char **argv) {
   mlir::registerAllPasses();
@@ -25,7 +27,8 @@ int main(int argc, char **argv) {
                   mlir::scf::SCFDialect, mlir::linalg::LinalgDialect,
                   mlir::func::FuncDialect, mlir::tensor::TensorDialect,
                   mlir::bufferization::BufferizationDialect,
-                  mlir::memref::MemRefDialect>();
+                  mlir::memref::MemRefDialect, ::mlir::gpu::GPUDialect,
+                  mlir::LLVM::LLVMDialect, mlir::affine::AffineDialect>();
 
   mlir::bufferization::func_ext::registerBufferizableOpInterfaceExternalModels(
       registry);
