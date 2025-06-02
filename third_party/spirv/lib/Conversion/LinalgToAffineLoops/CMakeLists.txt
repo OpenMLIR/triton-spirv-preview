@@ -6,4 +6,5 @@ add_triton_library(LinalgToAffineLoops
 
   LINK_LIBS PUBLIC
   MLIRPass
+  MLIRLinalgTransforms
 )
