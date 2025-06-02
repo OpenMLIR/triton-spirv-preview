@@ -87,10 +87,19 @@ class SPIRVBackend(BaseBackend):
         pm.run(mod)
         return mod
 
+    @staticmethod
+    def make_memir(mod, metadata, opt):
+        pm = ir.pass_manager(mod.context)
+        pm.enable_debug()
+        spirv.passes.memir.one_shot_bufferize(pm)
+        pm.run(mod)
+        return mod
+
 
     def add_stages(self, stages, options):
         stages["ttir"] = lambda src, metadata: self.make_ttir(src, metadata, options)
         stages["lair"] = lambda src, metadata: self.make_lair(src, metadata, options)
+        stages["memir"] = lambda src, metadata: self.make_memir(src, metadata, options)
 
 
     @functools.lru_cache()
