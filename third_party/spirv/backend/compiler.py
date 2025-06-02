@@ -92,6 +92,7 @@ class SPIRVBackend(BaseBackend):
         pm = ir.pass_manager(mod.context)
         pm.enable_debug()
         spirv.passes.memir.one_shot_bufferize(pm)
+        spirv.passes.memir.linalg_to_affine_loops(pm)
         pm.run(mod)
         return mod
 
