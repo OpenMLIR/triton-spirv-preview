@@ -6,6 +6,7 @@ add_llvm_executable(spirv-opt spirv-opt.cpp PARTIAL_SOURCES_INTENDED)
 llvm_update_compile_flags(spirv-opt)
 target_link_libraries(spirv-opt PRIVATE
   TritonTransforms
+  AffineToLLVMSPV
   LinalgToAffineLoops
   TritonToLinalg
   ${dialect_libs}
