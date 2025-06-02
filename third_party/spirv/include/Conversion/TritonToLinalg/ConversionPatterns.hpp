@@ -471,8 +471,9 @@ public:
     static constexpr mlir::gpu::Dimension dims[] = {mlir::gpu::Dimension::x,
                                                     mlir::gpu::Dimension::y,
                                                     mlir::gpu::Dimension::z};
-    auto blockId = rewriter.create<::mlir::gpu::BlockIdOp>(loc, dims[axis]);
-    auto id = rewriter.create<arith::IndexCastOp>(loc, i32_ty, blockId);
+    // use gpu::GlobalIdOp
+    auto globalIdOp = rewriter.create<::mlir::gpu::GlobalIdOp>(loc, dims[axis]);
+    auto id = rewriter.create<arith::IndexCastOp>(loc, i32_ty, globalIdOp);
     rewriter.replaceOp(op, id);
     return success();
   }
