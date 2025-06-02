@@ -1,1 +1,2 @@
+add_subdirectory(LinalgToAffineLoops)
 add_subdirectory(TritonToLinalg)

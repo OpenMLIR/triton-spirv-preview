@@ -3,6 +3,7 @@
 #include "mlir/Dialect/Linalg/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Tensor/Transforms/BufferizableOpInterfaceImpl.h"
 #include "spirv/include/Conversion/TritonToLinalg/Passes.h"
+#include "spirv/include/Conversion/LinalgToAffineLoops/Passes.h"
 
 #include "mlir/Tools/mlir-opt/MlirOptMain.h"
 
@@ -20,6 +21,7 @@
 int main(int argc, char **argv) {
   mlir::registerAllPasses();
   mlir::triton::spirv::registerTritonToLinalgPass();
+  mlir::triton::spirv::registerLinalgToAffineLoops();
 
   mlir::DialectRegistry registry;
   registry.insert<mlir::triton::TritonDialect, mlir::cf::ControlFlowDialect,

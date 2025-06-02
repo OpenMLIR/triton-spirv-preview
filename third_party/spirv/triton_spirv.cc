@@ -17,6 +17,7 @@
 #include "mlir/Dialect/Linalg/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Tensor/Transforms/BufferizableOpInterfaceImpl.h"
 #include "spirv/include/Conversion/TritonToLinalg/Passes.h"
+#include "spirv/include/Conversion/LinalgToAffineLoops/Passes.h"
 
 namespace py = pybind11;
 
@@ -29,6 +30,9 @@ void init_triton_spirv_passes_lair(py::module &&m) {
 void init_triton_spirv_passes_memir(py::module &&m) {
   m.def("one_shot_bufferize", [](mlir::PassManager &pm) {
     pm.addPass(mlir::bufferization::createOneShotBufferizePass());
+  });
+  m.def("linalg_to_affine_loops", [](mlir::PassManager &pm) {
+    pm.addPass(mlir::triton::spirv::createLinalgToAffineLoopsPass());
   });
 }
 
