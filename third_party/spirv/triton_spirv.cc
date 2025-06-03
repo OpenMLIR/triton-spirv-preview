@@ -16,8 +16,9 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Tensor/Transforms/BufferizableOpInterfaceImpl.h"
-#include "spirv/include/Conversion/TritonToLinalg/Passes.h"
+#include "spirv/include/Conversion/AffineToLLVMSPV/Passes.h"
 #include "spirv/include/Conversion/LinalgToAffineLoops/Passes.h"
+#include "spirv/include/Conversion/TritonToLinalg/Passes.h"
 
 namespace py = pybind11;
 
@@ -36,9 +37,16 @@ void init_triton_spirv_passes_memir(py::module &&m) {
   });
 }
 
+void init_triton_spirv_passes_llvmspvir(py::module &&m) {
+  m.def("affine_to_llvmspv", [](mlir::PassManager &pm) {
+    pm.addPass(mlir::triton::spirv::createAffineToLLVMSPVPass());
+  });
+}
+
 void init_triton_spirv(py::module &&m) {
   auto passes = m.def_submodule("passes");
   init_triton_spirv_passes_lair(passes.def_submodule("lair"));
+  init_triton_spirv_passes_llvmspvir(passes.def_submodule("llvmspvir"));
 
   // load dialects
   m.def("load_dialects", [](mlir::MLIRContext &context) {
