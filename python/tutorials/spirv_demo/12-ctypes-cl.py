@@ -1,17 +1,17 @@
 import ctypes
 import numpy as np
 
-# 加载 OpenCL 动态库
-cl = ctypes.CDLL("libOpenCL.so")  # Windows 上请用 "OpenCL.dll"
+# Load OpenCL shared library
+cl = ctypes.CDLL("libOpenCL.so")  # Use "OpenCL.dll" on Windows
 
-# 常量定义
+# Constant definitions
 CL_DEVICE_TYPE_GPU = 1 << 2
 CL_MEM_READ_ONLY = 1 << 2
 CL_MEM_WRITE_ONLY = 1 << 1
 CL_MEM_READ_WRITE = 1 << 0
 CL_SUCCESS = 0
 
-# 定义 OpenCL 接口参数类型（只定义用到的）
+# Define argument types for used OpenCL functions
 cl.clGetPlatformIDs.argtypes = [ctypes.c_uint, ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(ctypes.c_uint)]
 cl.clGetDeviceIDs.argtypes = [ctypes.c_void_p, ctypes.c_ulong, ctypes.c_uint, ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(ctypes.c_uint)]
 cl.clCreateContext.argtypes = [ctypes.c_void_p, ctypes.c_uint, ctypes.POINTER(ctypes.c_void_p), ctypes.c_void_p, ctypes.c_void_p, ctypes.POINTER(ctypes.c_int)]
@@ -30,7 +30,7 @@ cl.clEnqueueReadBuffer.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_ui
                                    ctypes.c_uint, ctypes.c_void_p, ctypes.c_void_p]
 cl.clFinish.argtypes = [ctypes.c_void_p]
 
-# 创建平台、设备、上下文、命令队列
+# Create platform, device, context, and command queue
 num_platforms = ctypes.c_uint()
 cl.clGetPlatformIDs(0, None, ctypes.byref(num_platforms))
 platforms = (ctypes.c_void_p * num_platforms.value)()
@@ -45,18 +45,18 @@ err = ctypes.c_int()
 context = cl.clCreateContext(None, 1, devices, None, None, ctypes.byref(err))
 queue = cl.clCreateCommandQueue(context, devices[0], 0, ctypes.byref(err))
 
-# 创建 host 数据
-n = 1024
-a_np = np.arange(n).astype(np.float32)
-b_np = np.arange(n).astype(np.float32)
+# Create host data
+n = 16231
+a_np = np.random.rand(n).astype(np.float32)
+b_np = np.random.rand(n).astype(np.float32)
 c_np = np.empty_like(a_np)
 
-# 创建 OpenCL buffer
+# Create OpenCL buffers
 a_buf = ctypes.c_void_p(cl.clCreateBuffer(context, CL_MEM_READ_ONLY, a_np.nbytes, None, ctypes.byref(err)))
 b_buf = ctypes.c_void_p(cl.clCreateBuffer(context, CL_MEM_READ_ONLY, b_np.nbytes, None, ctypes.byref(err)))
 c_buf = ctypes.c_void_p(cl.clCreateBuffer(context, CL_MEM_WRITE_ONLY, c_np.nbytes, None, ctypes.byref(err)))
 
-# 写入数据
+# Write input data to device
 cl.clEnqueueWriteBuffer = cl.clEnqueueWriteBuffer if hasattr(cl, 'clEnqueueWriteBuffer') else None
 if cl.clEnqueueWriteBuffer:
     cl.clEnqueueWriteBuffer.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_uint,
@@ -65,13 +65,22 @@ if cl.clEnqueueWriteBuffer:
     cl.clEnqueueWriteBuffer(queue, a_buf, True, 0, a_np.nbytes, a_np.ctypes.data_as(ctypes.c_void_p), 0, None, None)
     cl.clEnqueueWriteBuffer(queue, b_buf, True, 0, b_np.nbytes, b_np.ctypes.data_as(ctypes.c_void_p), 0, None, None)
 
-# 编写内核程序
+# Define OpenCL kernel source
 program_src = b"""
-__kernel void vec_add(__global const float *a,
-                      __global const float *b,
-                      __global float *c) {
-    int i = get_global_id(0);
-    c[i] = a[i] + b[i];
+__kernel void vec_add(__global float *a,
+                      __global float *b,
+                      __global float *c,
+                      int N) {
+    int id = get_global_id(0);
+    int lid = get_local_id(0);
+    __local float temp1[1024];
+    __local float temp2[1024];
+    if (id < N) {
+        temp1[lid] = a[id];
+        temp2[lid] = b[id];
+        barrier(CLK_LOCAL_MEM_FENCE);
+        c[id] = a[id] + b[id];
+    }
 }
 """
 
@@ -80,21 +89,29 @@ program_size = ctypes.c_size_t(len(program_src))
 program = cl.clCreateProgramWithSource(context, 1, ctypes.byref(program_src_ptr), ctypes.byref(program_size), ctypes.byref(err))
 cl.clBuildProgram(program, 1, devices, None, None, None)
 
-# 创建 kernel 并设置参数
+# Create kernel and set arguments
 kernel = cl.clCreateKernel(program, b"vec_add", ctypes.byref(err))
 cl.clSetKernelArg(kernel, 0, ctypes.sizeof(ctypes.c_void_p), ctypes.byref(a_buf))
 cl.clSetKernelArg(kernel, 1, ctypes.sizeof(ctypes.c_void_p), ctypes.byref(b_buf))
 cl.clSetKernelArg(kernel, 2, ctypes.sizeof(ctypes.c_void_p), ctypes.byref(c_buf))
+int_value = ctypes.c_int(n)
+err = cl.clSetKernelArg(kernel, 3, ctypes.sizeof(int_value), ctypes.byref(int_value))
 
-# 执行 kernel
-global_size = (ctypes.c_size_t * 1)(n)
-cl.clEnqueueNDRangeKernel(queue, kernel, 1, None, global_size, None, 0, None, None)
+block_size = 1024
+num_sm = (n + block_size - 1) // block_size
+
+# Launch kernel
+global_size = (ctypes.c_size_t * 3)(num_sm * block_size, 1, 1)
+local_size = (ctypes.c_size_t * 3)(block_size, 1, 1)
+launch_kenrel = cl.clEnqueueNDRangeKernel(queue, kernel, 3, None, global_size, local_size, 0, None, None)
+if launch_kenrel != CL_SUCCESS:
+    print('launch kenrel fail', launch_kenrel)
 cl.clFinish(queue)
 
-# 读取结果
+# Read results from device
 cl.clEnqueueReadBuffer(queue, c_buf, True, 0, c_np.nbytes, c_np.ctypes.data_as(ctypes.c_void_p), 0, None, None)
 
-# 验证结果
-print("结果是否正确：", np.allclose(c_np, a_np + b_np))
-print("前10项结果：")
+# Verify results
+print("Is result correct:", np.allclose(c_np, a_np + b_np))
+print("First 10 results:")
 print(c_np[:10])
