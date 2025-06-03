@@ -75,11 +75,14 @@ __kernel void vec_add(__global float *a,
     int lid = get_local_id(0);
     __local float temp1[1024];
     __local float temp2[1024];
+    __local float temp3[1024];
     if (id < N) {
         temp1[lid] = a[id];
         temp2[lid] = b[id];
         barrier(CLK_LOCAL_MEM_FENCE);
-        c[id] = a[id] + b[id];
+        temp3[lid] = temp1[lid] + temp2[lid];
+        barrier(CLK_LOCAL_MEM_FENCE);
+        c[id] = temp3[lid];
     }
 }
 """
@@ -87,7 +90,8 @@ __kernel void vec_add(__global float *a,
 program_src_ptr = ctypes.c_char_p(program_src)
 program_size = ctypes.c_size_t(len(program_src))
 program = cl.clCreateProgramWithSource(context, 1, ctypes.byref(program_src_ptr), ctypes.byref(program_size), ctypes.byref(err))
-cl.clBuildProgram(program, 1, devices, None, None, None)
+c = cl.clBuildProgram(program, 1, devices, None, None, None)
+print(c)
 
 # Create kernel and set arguments
 kernel = cl.clCreateKernel(program, b"vec_add", ctypes.byref(err))
