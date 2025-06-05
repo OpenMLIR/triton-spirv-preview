@@ -18,10 +18,10 @@
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/IR/AffineExpr.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/DLTI/DLTI.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MLProgram/IR/MLProgram.h"
@@ -31,11 +31,13 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tosa/IR/TosaOps.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/ControlFlowInterfaces.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Interfaces/ViewLikeInterface.h"
+#include "mlir/Tools/mlir-translate/MlirTranslateMain.h"
 #include "llvm/ADT/TypeSwitch.h"
 
 using namespace mlir;
@@ -57,8 +59,7 @@ Type peelAxiType(Type type) {
 }
 
 /// Parse array attributes.
-SmallVector<int64_t, 8> getIntArrayAttrValue(Operation *op,
-                                                       StringRef name) {
+SmallVector<int64_t, 8> getIntArrayAttrValue(Operation *op, StringRef name) {
   SmallVector<int64_t, 8> array;
   if (auto arrayAttr = op->getAttrOfType<ArrayAttr>(name)) {
     for (auto attr : arrayAttr)
@@ -121,9 +122,11 @@ public:
             scf::ReduceReturnOp, scf::YieldOp,
 
             // Affine statements.
-            affine::AffineForOp, affine::AffineIfOp, affine::AffineParallelOp, affine::AffineApplyOp,
-            affine::AffineMaxOp, affine::AffineMinOp, affine::AffineLoadOp, affine::AffineStoreOp,
-            affine::AffineVectorLoadOp, affine::AffineVectorStoreOp, affine::AffineYieldOp,
+            affine::AffineForOp, affine::AffineIfOp, affine::AffineParallelOp,
+            affine::AffineApplyOp, affine::AffineMaxOp, affine::AffineMinOp,
+            affine::AffineLoadOp, affine::AffineStoreOp,
+            affine::AffineVectorLoadOp, affine::AffineVectorStoreOp,
+            affine::AffineYieldOp,
 
             // Memref statements.
             memref::AllocOp, memref::AllocaOp, memref::LoadOp, memref::StoreOp,
@@ -272,7 +275,8 @@ public:
 #undef HANDLE
 };
 
-// static std::string getStorageTypeAndImpl(MemoryKind kind, std::string typeStr,
+// static std::string getStorageTypeAndImpl(MemoryKind kind, std::string
+// typeStr,
 //                                          std::string implStr) {
 //   switch (kind) {
 //   case MemoryKind::LUTRAM_1P:
@@ -627,7 +631,8 @@ public:
       }
     }
     if (auto binaryRHS = mlir::dyn_cast<AffineBinaryOpExpr>(expr.getRHS())) {
-      if (auto constRHS = mlir::dyn_cast<AffineConstantExpr>(binaryRHS.getRHS())) {
+      if (auto constRHS =
+              mlir::dyn_cast<AffineConstantExpr>(binaryRHS.getRHS())) {
         if ((unsigned)*syntax == (unsigned)*"+" && constRHS.getValue() == -1 &&
             binaryRHS.getKind() == AffineExprKind::Mul) {
           visit(expr.getLHS());
@@ -668,16 +673,15 @@ public:
   //     return emitter.emitAlloc(op), true;
   //   return op.emitOpError("only support depth of 1"), false;
   // }
-  // bool visitOp(ConstBufferOp op) { return emitter.emitConstBuffer(op), true; }
-  // bool visitOp(StreamOp op) { return emitter.emitStreamChannel(op), true; }
+  // bool visitOp(ConstBufferOp op) { return emitter.emitConstBuffer(op), true;
+  // } bool visitOp(StreamOp op) { return emitter.emitStreamChannel(op), true; }
   // bool visitOp(StreamReadOp op) { return emitter.emitStreamRead(op), true; }
-  // bool visitOp(StreamWriteOp op) { return emitter.emitStreamWrite(op), true; }
-  // bool visitOp(AxiBundleOp op) { return true; }
-  // bool visitOp(AxiPortOp op) { return emitter.emitAxiPort(op), true; }
-  // bool visitOp(AxiPackOp op) { return false; }
-  // bool visitOp(PrimMulOp op) { return emitter.emitPrimMul(op), true; }
-  // bool visitOp(PrimCastOp op) { return emitter.emitAssign(op), true; }
-  // bool visitOp(hls::AffineSelectOp op) {
+  // bool visitOp(StreamWriteOp op) { return emitter.emitStreamWrite(op), true;
+  // } bool visitOp(AxiBundleOp op) { return true; } bool visitOp(AxiPortOp op)
+  // { return emitter.emitAxiPort(op), true; } bool visitOp(AxiPackOp op) {
+  // return false; } bool visitOp(PrimMulOp op) { return
+  // emitter.emitPrimMul(op), true; } bool visitOp(PrimCastOp op) { return
+  // emitter.emitAssign(op), true; } bool visitOp(hls::AffineSelectOp op) {
   //   return emitter.emitAffineSelect(op), true;
   // }
 
@@ -694,31 +698,41 @@ public:
   bool visitOp(scf::YieldOp op) { return emitter.emitScfYield(op), true; };
 
   /// Affine statements.
-  bool visitOp(affine::AffineForOp op) { return emitter.emitAffineFor(op), true; }
+  bool visitOp(affine::AffineForOp op) {
+    return emitter.emitAffineFor(op), true;
+  }
   bool visitOp(affine::AffineIfOp op) { return emitter.emitAffineIf(op), true; }
   bool visitOp(affine::AffineParallelOp op) {
     return emitter.emitAffineParallel(op), true;
   }
-  bool visitOp(affine::AffineApplyOp op) { return emitter.emitAffineApply(op), true; }
+  bool visitOp(affine::AffineApplyOp op) {
+    return emitter.emitAffineApply(op), true;
+  }
   bool visitOp(affine::AffineMaxOp op) {
     return emitter.emitAffineMaxMin(op, "max"), true;
   }
   bool visitOp(affine::AffineMinOp op) {
     return emitter.emitAffineMaxMin(op, "min"), true;
   }
-  bool visitOp(affine::AffineLoadOp op) { return emitter.emitAffineLoad(op), true; }
-  bool visitOp(affine::AffineStoreOp op) { return emitter.emitAffineStore(op), true; }
+  bool visitOp(affine::AffineLoadOp op) {
+    return emitter.emitAffineLoad(op), true;
+  }
+  bool visitOp(affine::AffineStoreOp op) {
+    return emitter.emitAffineStore(op), true;
+  }
   bool visitOp(affine::AffineVectorLoadOp op) { return false; }
   bool visitOp(affine::AffineVectorStoreOp op) { return false; }
-  bool visitOp(affine::AffineYieldOp op) { return emitter.emitAffineYield(op), true; }
+  bool visitOp(affine::AffineYieldOp op) {
+    return emitter.emitAffineYield(op), true;
+  }
 
   /// Vector statements.
   // bool visitOp(hls::VectorInitOp op) {
   //   return emitter.emitVectorInit(op), true;
   // }
   // bool visitOp(vector::InsertOp op) { return emitter.emitInsert(op), true; };
-  // bool visitOp(vector::ExtractOp op) { return emitter.emitExtract(op), true; };
-  // bool visitOp(vector::ExtractElementOp op) {
+  // bool visitOp(vector::ExtractOp op) { return emitter.emitExtract(op), true;
+  // }; bool visitOp(vector::ExtractElementOp op) {
   //   return emitter.emitExtractElement(op), true;
   // };
   // bool visitOp(vector::TransferReadOp op) {
@@ -787,8 +801,12 @@ public:
   bool visitOp(arith::MulFOp op) { return emitter.emitBinary(op, "*"), true; }
   bool visitOp(arith::DivFOp op) { return emitter.emitBinary(op, "/"), true; }
   bool visitOp(arith::RemFOp op) { return emitter.emitBinary(op, "%"), true; }
-  bool visitOp(arith::MaximumFOp op) { return emitter.emitMaxMin(op, "max"), true; }
-  bool visitOp(arith::MinimumFOp op) { return emitter.emitMaxMin(op, "min"), true; }
+  bool visitOp(arith::MaximumFOp op) {
+    return emitter.emitMaxMin(op, "max"), true;
+  }
+  bool visitOp(arith::MinimumFOp op) {
+    return emitter.emitMaxMin(op, "min"), true;
+  }
   bool visitOp(math::PowFOp op) { return emitter.emitMaxMin(op, "pow"), true; }
 
   /// Integer binary expressions.
@@ -899,7 +917,6 @@ void ModuleEmitter::emitAssign(AssignOpType op) {
   emitInfoAndNewLine(op);
   emitNestedLoopFooter(rank);
 }
-
 
 /// Control flow operation emitters.
 void ModuleEmitter::emitCall(func::CallOp op) {
@@ -1277,7 +1294,8 @@ void ModuleEmitter::emitAffineYield(affine::AffineYieldOp op) {
       emitInfoAndNewLine(op);
       emitNestedLoopFooter(rank);
     }
-  } else if (auto parentOp = dyn_cast<affine::AffineParallelOp>(op->getParentOp())) {
+  } else if (auto parentOp =
+                 dyn_cast<affine::AffineParallelOp>(op->getParentOp())) {
     indent() << "if (";
     unsigned ivIdx = 0;
     for (auto iv : parentOp.getBody()->getArguments()) {
@@ -1658,7 +1676,8 @@ void ModuleEmitter::emitLoopDirectives(Operation *loop) {
   //   indent() << "#pragma HLS dependence false\n";
 
   // if (loopDirect.getPipeline()) {
-  //   indent() << "#pragma HLS pipeline II=" << loopDirect.getTargetII() << "\n";
+  //   indent() << "#pragma HLS pipeline II=" << loopDirect.getTargetII() <<
+  //   "\n";
   //   // if (enforceFalseDependency.getValue())
   //   //   indent() << "#pragma HLS dependence false\n";
   // } else if (loopDirect.getDataflow())
@@ -1674,7 +1693,8 @@ void ModuleEmitter::emitArrayDirectives(Value memref, bool isInterface) {
   // if (auto attr = type.getLayout().dyn_cast<PartitionLayoutAttr>()) {
   //   unsigned dim = 0;
   //   for (auto [kind, factor] :
-  //        llvm::zip(attr.getKinds(), attr.getActualFactors(type.getShape()))) {
+  //        llvm::zip(attr.getKinds(), attr.getActualFactors(type.getShape())))
+  //        {
   //     if (factor != 1) {
   //       emitPragmaFlag = true;
 
@@ -1732,7 +1752,8 @@ void ModuleEmitter::emitFunctionDirectives(func::FuncOp func,
   return;
   // // Only top function should emit interface pragmas.
   // if (hasTopFuncAttr(func)) {
-  //   // indent() << "#pragma HLS interface s_axilite port=return bundle=ctrl\n";
+  //   // indent() << "#pragma HLS interface s_axilite port=return
+  //   bundle=ctrl\n";
   //   // for (auto &port : portList) {
   //   //   // Axi ports are handled separately.
   //   //   if (port.getType().isa<AxiType>())
@@ -1773,7 +1794,8 @@ void ModuleEmitter::emitFunctionDirectives(func::FuncOp func,
 
   // if (auto funcDirect = getFuncDirective(func)) {
   //   if (funcDirect.getPipeline()) {
-  //     indent() << "#pragma HLS pipeline II=" << funcDirect.getTargetInterval()
+  //     indent() << "#pragma HLS pipeline II=" <<
+  //     funcDirect.getTargetInterval()
   //              << "\n";
   //     // An empty line.
   //     os << "\n";
@@ -1885,14 +1907,14 @@ using namespace std;
 
 )XXX";
 
-
   // Emit all functions in the call graph in a post order.
   CallGraph graph(module);
   llvm::SmallDenseSet<func::FuncOp> emittedFuncs;
   for (auto node : llvm::post_order<const CallGraph *>(&graph)) {
     if (node->isExternal())
       continue;
-    if (auto func = node->getCallableRegion()->getParentOfType<func::FuncOp>()) {
+    if (auto func =
+            node->getCallableRegion()->getParentOfType<func::FuncOp>()) {
       emitFunction(func);
       emittedFuncs.insert(func);
     }
@@ -1922,6 +1944,17 @@ void registerEmitHLSCppTranslation() {
   static TranslateFromMLIRRegistration toHLSCpp(
       "scalehls-emit-hlscpp", "Translate MLIR into synthesizable C++",
       emitHLSCpp, [&](DialectRegistry &registry) {
+        registry.insert<mlir::math::MathDialect, mlir::arith::ArithDialect,
+                        mlir::scf::SCFDialect, mlir::func::FuncDialect,
+                        mlir::memref::MemRefDialect, ::mlir::gpu::GPUDialect,
+                        mlir::affine::AffineDialect>();
         // registerAllDialects(registry);
       });
+}
+
+int main(int argc, char **argv) {
+  registerEmitHLSCppTranslation();
+
+  return mlir::failed(
+      mlir::mlirTranslateMain(argc, argv, "ScaleHLS Translation Tool"));
 }
