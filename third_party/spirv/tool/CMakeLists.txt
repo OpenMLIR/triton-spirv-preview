@@ -18,3 +18,10 @@ target_link_libraries(spirv-opt PRIVATE
 )
 
 mlir_check_all_link_libraries(spirv-opt)
+
+add_mlir_library(MLIRScaleHLSEmitHLSCpp
+  EmitHLSCpp.cpp
+
+  LINK_LIBS PUBLIC
+  ${dialect_libs}
+  )
