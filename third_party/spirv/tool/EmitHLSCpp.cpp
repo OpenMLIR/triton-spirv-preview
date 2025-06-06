@@ -1,6 +1,7 @@
 //===----------------------------------------------------------------------===//
 //
 // Copyright 2020-2021 The ScaleHLS Authors.
+// Refer to https://github.com/UIUC-ChenLab/ScaleHLS-HIDA/blob/main/lib/Translation/EmitHLSCpp.cpp
 //
 //===----------------------------------------------------------------------===//
 
@@ -52,12 +53,6 @@ static llvm::cl::opt<int64_t> limitDspNumber("limit-dsp-number",
 // Utils
 //===----------------------------------------------------------------------===//
 
-Type peelAxiType(Type type) {
-  // if (auto axiType = mlir::dyn_cast<AxiType>(type))
-  //   return axiType.getElementType();
-  return type;
-}
-
 /// Parse array attributes.
 SmallVector<int64_t, 8> getIntArrayAttrValue(Operation *op, StringRef name) {
   SmallVector<int64_t, 8> array;
@@ -73,23 +68,13 @@ SmallVector<int64_t, 8> getIntArrayAttrValue(Operation *op, StringRef name) {
 }
 
 static std::string getDataTypeName(Type type) {
-  auto valType = peelAxiType(type);
+  auto valType = type;
 
   // Handle aggregated types, including memref, vector, and stream.
   if (auto arrayType = mlir::dyn_cast<MemRefType>(valType))
     return getDataTypeName(arrayType.getElementType());
-  // else if (auto streamType = mlir::dyn_cast<StreamType>(valType)) {
-  //   std::string streamName = "hls::stream<";
-  //   streamName += getDataTypeName(streamType.getElementType());
-  //   streamName += ">";
-  //   return streamName;
-  // } else if (auto vectorType = mlir::dyn_cast<VectorType>(valType)) {
-  //   std::string vectorName = "hls::vector<";
-  //   vectorName += getDataTypeName(vectorType.getElementType());
-  //   vectorName += ", " + std::to_string(vectorType.getNumElements()) + ">";
-  //   return vectorName;
-  // }
 
+  // Refer to https://registry.khronos.org/OpenCL/specs/3.0-unified/pdf/OpenCL_C.pdf
   // Handle scalar types, including float and integer.
   if (mlir::isa<Float32Type>(valType))
     return "float";
@@ -100,12 +85,16 @@ static std::string getDataTypeName(Type type) {
   else if (auto intType = mlir::dyn_cast<IntegerType>(valType)) {
     if (intType.getWidth() == 1)
       return "bool";
-    std::string intName = "ap_";
-    intName += intType.isUnsigned() ? "u" : "";
-    intName += "int<" + std::to_string(intType.getWidth()) + ">";
-    return intName;
+    if (intType.getWidth() == 32 && !intType.isUnsigned())
+      return "int";
+    if (intType.getWidth() == 64 && !intType.isUnsigned())
+      return "long";
+    if (intType.getWidth() == 32 && intType.isUnsigned())
+      return "unit";
+    if (intType.getWidth() == 64 && intType.isUnsigned())
+      return "ulong";
   }
-  return "unknown_type";
+  llvm_unreachable("Unsupported type.");
 }
 template <typename ConcreteType, typename ResultType, typename... ExtraArgs>
 class HLSVisitorBase {
@@ -275,66 +264,6 @@ public:
 #undef HANDLE
 };
 
-// static std::string getStorageTypeAndImpl(MemoryKind kind, std::string
-// typeStr,
-//                                          std::string implStr) {
-//   switch (kind) {
-//   case MemoryKind::LUTRAM_1P:
-//     return typeStr + "=ram_1p " + implStr + "=lutram";
-//   case MemoryKind::LUTRAM_2P:
-//     return typeStr + "=ram_2p " + implStr + "=lutram";
-//   case MemoryKind::LUTRAM_S2P:
-//     return typeStr + "=ram_s2p " + implStr + "=lutram";
-//   case MemoryKind::BRAM_1P:
-//     return typeStr + "=ram_1p " + implStr + "=bram";
-//   case MemoryKind::BRAM_2P:
-//     return typeStr + "=ram_2p " + implStr + "=bram";
-//   case MemoryKind::BRAM_S2P:
-//     return typeStr + "=ram_s2p " + implStr + "=bram";
-//   case MemoryKind::BRAM_T2P:
-//     return typeStr + "=ram_t2p " + implStr + "=bram";
-//   case MemoryKind::URAM_1P:
-//     return typeStr + "=ram_1p " + implStr + "=uram";
-//   case MemoryKind::URAM_2P:
-//     return typeStr + "=ram_2p " + implStr + "=uram";
-//   case MemoryKind::URAM_S2P:
-//     return typeStr + "=ram_s2p " + implStr + "=uram";
-//   case MemoryKind::URAM_T2P:
-//     return typeStr + "=ram_t2p " + implStr + "=uram";
-//   default:
-//     return typeStr + "=ram_t2p " + implStr + "=bram";
-//   }
-// }
-
-// static std::string getVivadoStorageTypeAndImpl(MemoryKind kind) {
-//   switch (kind) {
-//   case MemoryKind::LUTRAM_1P:
-//     return "ram_1p_lutram";
-//   case MemoryKind::LUTRAM_2P:
-//     return "ram_2p_lutram";
-//   case MemoryKind::LUTRAM_S2P:
-//     return "ram_s2p_lutram";
-//   case MemoryKind::BRAM_1P:
-//     return "ram_1p_bram";
-//   case MemoryKind::BRAM_2P:
-//     return "ram_2p_bram";
-//   case MemoryKind::BRAM_S2P:
-//     return "ram_s2p_bram";
-//   case MemoryKind::BRAM_T2P:
-//     return "ram_t2p_bram";
-//   case MemoryKind::URAM_1P:
-//     return "ram_1p_uram";
-//   case MemoryKind::URAM_2P:
-//     return "ram_2p_uram";
-//   case MemoryKind::URAM_S2P:
-//     return "ram_s2p_uram";
-//   case MemoryKind::URAM_T2P:
-//     return "ram_t2p_uram";
-//   default:
-//     return "ram_t2p_bram";
-//   }
-// }
-
 //===----------------------------------------------------------------------===//
 // Some Base Classes
 //===----------------------------------------------------------------------===//
@@ -412,7 +341,7 @@ SmallString<8> ScaleHLSEmitterBase::addName(Value val, bool isPtr) {
   if (isPtr)
     valName += "*";
 
-  valName += StringRef("v" + std::to_string(state.nameTable.size()));
+  valName += StringRef("var_" + std::to_string(state.nameTable.size()));
   state.nameTable[val] = valName;
 
   return valName;
@@ -521,15 +450,6 @@ public:
   void emitAffineStore(affine::AffineStoreOp op);
   void emitAffineYield(affine::AffineYieldOp op);
 
-  /// Vector-related statement emitters.
-  // void emitVectorInit(hls::VectorInitOp op);
-  // void emitInsert(vector::InsertOp op);
-  // void emitExtract(vector::ExtractOp op);
-  // void emitExtractElement(vector::ExtractElementOp op);
-  // void emitTransferRead(vector::TransferReadOp op);
-  // void emitTransferWrite(vector::TransferWriteOp op);
-  // void emitBroadcast(vector::BroadcastOp);
-
   /// Memref-related statement emitters.
   template <typename OpType> void emitAlloc(OpType op);
   void emitLoad(memref::LoadOp op);
@@ -564,9 +484,6 @@ private:
 
   /// MLIR component and HLS C++ pragma emitters.
   void emitBlock(Block &block);
-  void emitLoopDirectives(Operation *op);
-  void emitArrayDirectives(Value memref, bool isInterface = false);
-  void emitFunctionDirectives(func::FuncOp func, ArrayRef<Value> portList);
   void emitFunction(func::FuncOp func);
 
   unsigned numDSPs = 0;
@@ -667,24 +584,6 @@ public:
   StmtVisitor(ModuleEmitter &emitter) : emitter(emitter) {}
   using HLSVisitorBase::visitOp;
 
-  // /// HLS dialect operations.
-  // bool visitOp(BufferOp op) {
-  //   if (op.getDepth() == 1)
-  //     return emitter.emitAlloc(op), true;
-  //   return op.emitOpError("only support depth of 1"), false;
-  // }
-  // bool visitOp(ConstBufferOp op) { return emitter.emitConstBuffer(op), true;
-  // } bool visitOp(StreamOp op) { return emitter.emitStreamChannel(op), true; }
-  // bool visitOp(StreamReadOp op) { return emitter.emitStreamRead(op), true; }
-  // bool visitOp(StreamWriteOp op) { return emitter.emitStreamWrite(op), true;
-  // } bool visitOp(AxiBundleOp op) { return true; } bool visitOp(AxiPortOp op)
-  // { return emitter.emitAxiPort(op), true; } bool visitOp(AxiPackOp op) {
-  // return false; } bool visitOp(PrimMulOp op) { return
-  // emitter.emitPrimMul(op), true; } bool visitOp(PrimCastOp op) { return
-  // emitter.emitAssign(op), true; } bool visitOp(hls::AffineSelectOp op) {
-  //   return emitter.emitAffineSelect(op), true;
-  // }
-
   /// Function operations.
   bool visitOp(func::CallOp op) { return emitter.emitCall(op), true; }
   bool visitOp(func::ReturnOp op) { return true; }
@@ -752,8 +651,8 @@ public:
   bool visitOp(memref::StoreOp op) { return emitter.emitStore(op), true; }
   bool visitOp(memref::DeallocOp op) { return true; }
   bool visitOp(memref::CopyOp op) { return emitter.emitMemCpy(op), true; }
-  // bool visitOp(memref::ReshapeOp op) { return emitter.emitReshape(op), true;
-  // } bool visitOp(memref::CollapseShapeOp op) {
+  // bool visitOp(memref::ReshapeOp op) { return emitter.emitReshape(op), true;}
+  // bool visitOp(memref::CollapseShapeOp op) {
   //   return emitter.emitReshape(op), true;
   // }
   // bool visitOp(memref::ExpandShapeOp op) {
@@ -985,7 +884,6 @@ void ModuleEmitter::emitScfFor(scf::ForOp op) {
 
   addIndent();
 
-  emitLoopDirectives(op);
   emitBlock(*op.getBody());
   reduceIndent();
 
@@ -1098,7 +996,6 @@ void ModuleEmitter::emitAffineFor(affine::AffineForOp op) {
 
   addIndent();
 
-  emitLoopDirectives(op);
   emitBlock(*op.getBody());
   reduceIndent();
 
@@ -1391,7 +1288,6 @@ template <typename OpType> void ModuleEmitter::emitAlloc(OpType op) {
   emitArrayDecl(op.getResult());
   os << ";";
   emitInfoAndNewLine(op);
-  emitArrayDirectives(op.getResult());
 }
 
 void ModuleEmitter::emitLoad(memref::LoadOp op) {
@@ -1574,7 +1470,7 @@ void ModuleEmitter::emitValue(Value val, unsigned rank, bool isPtr,
 
 void ModuleEmitter::emitArrayDecl(Value array) {
   assert(!isDeclared(array) && "has been declared before.");
-  auto arrayType = mlir::dyn_cast<MemRefType>(peelAxiType(array.getType()));
+  auto arrayType = mlir::dyn_cast<MemRefType>(array.getType());
 
   if (arrayType.hasStaticShape()) {
     emitValue(array);
@@ -1665,170 +1561,12 @@ void ModuleEmitter::emitBlock(Block &block) {
   }
 }
 
-void ModuleEmitter::emitLoopDirectives(Operation *loop) {
-  return;
-  // auto loopDirect = getLoopDirective(loop);
-  // if (!loopDirect)
-  //   return;
-
-  // if (!hasParallelAttr(loop) && !loopDirect.getDataflow() &&
-  //     enforceFalseDependency.getValue())
-  //   indent() << "#pragma HLS dependence false\n";
-
-  // if (loopDirect.getPipeline()) {
-  //   indent() << "#pragma HLS pipeline II=" << loopDirect.getTargetII() <<
-  //   "\n";
-  //   // if (enforceFalseDependency.getValue())
-  //   //   indent() << "#pragma HLS dependence false\n";
-  // } else if (loopDirect.getDataflow())
-  //   indent() << "#pragma HLS dataflow\n";
-}
-
-void ModuleEmitter::emitArrayDirectives(Value memref, bool isInterface) {
-  return;
-  // bool emitPragmaFlag = false;
-  // auto type = memref.getType().cast<MemRefType>();
-
-  // // Emit array_partition pragma(s).
-  // if (auto attr = type.getLayout().dyn_cast<PartitionLayoutAttr>()) {
-  //   unsigned dim = 0;
-  //   for (auto [kind, factor] :
-  //        llvm::zip(attr.getKinds(), attr.getActualFactors(type.getShape())))
-  //        {
-  //     if (factor != 1) {
-  //       emitPragmaFlag = true;
-
-  //       // FIXME: How to handle external memories?
-  //       indent() << "#pragma HLS array_partition";
-  //       os << " variable=";
-  //       emitValue(memref);
-
-  //       // Emit partition type.
-  //       os << " " << stringifyPartitionKind(kind);
-  //       os << " factor=" << factor;
-
-  //       // Vitis HLS has a wierd feature/bug that will automatically collapse
-  //       // the first dimension if its size is equal to one.
-  //       auto directiveDim = dim + 1;
-  //       if (emitVitisDirectives.getValue())
-  //         if (type.getShape().front() == 1)
-  //           directiveDim = dim;
-  //       os << " dim=" << directiveDim << "\n";
-  //     }
-  //     ++dim;
-  //   }
-  // }
-
-  // Emit resource pragma when the array is not DRAM kind and is not fully
-  // partitioned.
-  // if (!isInterface) {
-  //   auto kind = getMemoryKind(type);
-  //   if (kind != MemoryKind::DRAM && !isFullyPartitioned(type)) {
-  //     emitPragmaFlag = true;
-
-  //     if (emitVitisDirectives.getValue()) {
-  //       indent() << "#pragma HLS bind_storage";
-  //       os << " variable=";
-  //       emitValue(memref);
-  //       os << " " << getStorageTypeAndImpl(kind, "type", "impl");
-  //     } else {
-  //       indent() << "#pragma HLS resource";
-  //       os << " variable=";
-  //       emitValue(memref);
-  //       os << " core=" << getVivadoStorageTypeAndImpl(kind);
-  //     }
-  //     // Emit a new line.
-  //     os << "\n";
-  //   }
-  // }
-
-  // Emit an empty line.
-  // if (emitPragmaFlag)
-  //   os << "\n";
-}
-
-void ModuleEmitter::emitFunctionDirectives(func::FuncOp func,
-                                           ArrayRef<Value> portList) {
-  return;
-  // // Only top function should emit interface pragmas.
-  // if (hasTopFuncAttr(func)) {
-  //   // indent() << "#pragma HLS interface s_axilite port=return
-  //   bundle=ctrl\n";
-  //   // for (auto &port : portList) {
-  //   //   // Axi ports are handled separately.
-  //   //   if (port.getType().isa<AxiType>())
-  //   //     continue;
-
-  //     // // Handle normal memref or stream types.
-  //     // if (port.getType().isa<MemRefType, StreamType>()) {
-  //     //   indent() << "#pragma HLS interface";
-
-  //     //   if (auto memrefPortType = port.getType().dyn_cast<MemRefType>()) {
-  //     //     if (getMemoryKind(memrefPortType) == MemoryKind::DRAM)
-  //     //       os << " m_axi offset=slave";
-  //     //     else
-  //     //       os << " bram";
-  //     //   } else
-  //     //     os << " axis";
-
-  //     //   os << " port=";
-  //     //   emitValue(port);
-  //     //   os << "\n";
-
-  //     // } else {
-  //     //   // For scalar types, we always emit them as AXI-Lite ports.
-  //     //   auto name = getName(port);
-  //     //   if (name.front() == "*"[0])
-  //     //     name.erase(name.begin());
-  //     //   indent() << "#pragma HLS interface s_axilite port=" << name
-  //     //            << " bundle=ctrl\n";
-  //     // }
-
-  //     if (port.getType().isa<MemRefType>())
-  //       emitArrayDirectives(port, true);
-  //   }
-  // }
-
-  // if (func->getAttr("inline"))
-  //   indent() << "#pragma HLS inline\n";
-
-  // if (auto funcDirect = getFuncDirective(func)) {
-  //   if (funcDirect.getPipeline()) {
-  //     indent() << "#pragma HLS pipeline II=" <<
-  //     funcDirect.getTargetInterval()
-  //              << "\n";
-  //     // An empty line.
-  //     os << "\n";
-  //   } else if (funcDirect.getDataflow()) {
-  //     indent() << "#pragma HLS dataflow\n";
-  //     // An empty line.
-  //     os << "\n";
-  //   }
-  // }
-}
-
 void ModuleEmitter::emitFunction(func::FuncOp func) {
   if (func.getBlocks().size() != 1)
     emitError(func, "has zero or more than one basic blocks.");
 
-  // if (hasTopFuncAttr(func))
-  //   os << "/// This is top function.\n";
-
-  // if (auto timing = getTiming(func)) {
-  //   os << "/// Latency=" << timing.getLatency();
-  //   os << ", interval=" << timing.getInterval();
-  //   os << "\n";
-  // }
-
-  // if (auto resource = getResource(func)) {
-  //   os << "/// DSP=" << resource.getDsp();
-  //   os << ", BRAM=" << resource.getBram();
-  //   // os << ", LUT=" << resource.getLut();
-  //   os << "\n";
-  // }
-
   // Emit function signature.
-  os << "void " << func.getName() << "(\n";
+  os << "__kernel void " << func.getName() << "(\n";
   addIndent();
 
   // This vector is to record all ports of the function.
@@ -1838,12 +1576,10 @@ void ModuleEmitter::emitFunction(func::FuncOp func) {
   unsigned argIdx = 0;
   for (auto &arg : func.getArguments()) {
     indent();
-    auto type = peelAxiType(arg.getType());
+    auto type = arg.getType();
 
     if (mlir::isa<MemRefType>(type))
       emitArrayDecl(arg);
-    // else if (mlir::isa<StreamType>(type))
-    //   emitValue(arg, /*rank=*/0, /*isPtr=*/false, /*isRef=*/true);
     else
       emitValue(arg);
 
@@ -1875,7 +1611,6 @@ void ModuleEmitter::emitFunction(func::FuncOp func) {
   // Emit function body.
   addIndent();
 
-  emitFunctionDirectives(func, portList);
   emitBlock(func.front());
   reduceIndent();
   os << "}\n";
@@ -1885,25 +1620,12 @@ void ModuleEmitter::emitFunction(func::FuncOp func) {
 
 /// Top-level MLIR module emitter.
 void ModuleEmitter::emitModule(ModuleOp module) {
-  os << R"XXX(
-//===------------------------------------------------------------*- C++ -*-===//
+  os << R"XXX(//===------------------------------------------------------------*- C++ -*-===//
 //
-// Automatically generated file for High-level Synthesis (HLS).
+// Automatically generated file for OpenCL
 //
 //===----------------------------------------------------------------------===//
-
-#include <algorithm>
-#include <ap_axi_sdata.h>
-#include <ap_fixed.h>
-#include <ap_int.h>
-#include <hls_math.h>
-#include <hls_stream.h>
-#include <hls_vector.h>
-#include <math.h>
 #include <stdint.h>
-#include <string.h>
-
-using namespace std;
 
 )XXX";
 
