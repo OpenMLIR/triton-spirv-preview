@@ -20,9 +20,9 @@ target_link_libraries(spirv-opt PRIVATE
 
 mlir_check_all_link_libraries(spirv-opt)
 
-add_llvm_executable(standalone-translate EmitHLSCpp.cpp)
-llvm_update_compile_flags(standalone-translate)
-target_link_libraries(standalone-translate
+add_llvm_executable(triton-spirv-translate EmitOpenCL.cpp)
+llvm_update_compile_flags(triton-spirv-translate)
+target_link_libraries(triton-spirv-translate
   PRIVATE
   ${dialect_libs}
   ${translation_libs}
@@ -33,4 +33,4 @@ target_link_libraries(standalone-translate
   MLIRTranslateLib
   MLIRSupport
 )
-mlir_check_link_libraries(standalone-translate)
+mlir_check_link_libraries(triton-spirv-translate)

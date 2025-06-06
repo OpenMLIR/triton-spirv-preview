@@ -716,7 +716,6 @@ void ModuleEmitter::emitModule(ModuleOp module) {
 // Automatically generated file for OpenCL
 //
 //===----------------------------------------------------------------------===//
-#include <stdint.h>
 
 )XXX";
 
@@ -744,30 +743,29 @@ void ModuleEmitter::emitModule(ModuleOp module) {
 }
 
 //===----------------------------------------------------------------------===//
-// Entry of scalehls-translate
+// Entry of triton-spirv-translate
 //===----------------------------------------------------------------------===//
 
-LogicalResult emitHLSCpp(ModuleOp module, llvm::raw_ostream &os) {
+LogicalResult emitOpenCL(ModuleOp module, llvm::raw_ostream &os) {
   ScaleHLSEmitterState state(os);
   ModuleEmitter(state).emitModule(module);
   return failure(state.encounteredError);
 }
 
-void registerEmitHLSCppTranslation() {
-  static TranslateFromMLIRRegistration toHLSCpp(
-      "scalehls-emit-hlscpp", "Translate MLIR into synthesizable C++",
-      emitHLSCpp, [&](DialectRegistry &registry) {
+void registerEmitOpenCLTranslation() {
+  static TranslateFromMLIRRegistration toOpenCL(
+      "triton-spirv-emit-opencl", "Translate MLIR into OpenCL",
+      emitOpenCL, [&](DialectRegistry &registry) {
         registry.insert<mlir::math::MathDialect, mlir::arith::ArithDialect,
                         mlir::scf::SCFDialect, mlir::func::FuncDialect,
                         mlir::memref::MemRefDialect, ::mlir::gpu::GPUDialect,
                         mlir::affine::AffineDialect>();
-        // registerAllDialects(registry);
       });
 }
 
 int main(int argc, char **argv) {
-  registerEmitHLSCppTranslation();
+  registerEmitOpenCLTranslation();
 
   return mlir::failed(
-      mlir::mlirTranslateMain(argc, argv, "ScaleHLS Translation Tool"));
+      mlir::mlirTranslateMain(argc, argv, "SPIRV Translation Tool"));
 }
