@@ -442,6 +442,7 @@ public:
   template <typename OpType> void emitAlloc(OpType op);
   void emitLoad(memref::LoadOp op);
   void emitStore(memref::StoreOp op);
+  void emitMemCpyValue(Value val);
   void emitMemCpy(memref::CopyOp op);
   template <typename OpType> void emitReshape(OpType op);
 

@@ -493,7 +493,7 @@ template <typename OpType> void ModuleEmitter::emitAlloc(OpType op) {
   if (!op.getType().hasStaticShape())
     emitError(op, "is unranked or has dynamic shape.");
 
-  indent();
+  indent() << "__local ";
   emitArrayDecl(op.getResult());
   os << ";";
   emitInfoAndNewLine(op);
@@ -527,8 +527,78 @@ void ModuleEmitter::emitStore(memref::StoreOp op) {
   emitInfoAndNewLine(op);
 }
 
-void ModuleEmitter::emitMemCpy(memref::CopyOp op) {
+memref::SubViewOp getSubviewOp(Value val) {
+  return val.getDefiningOp<memref::SubViewOp>();
+}
 
+bool checkOneDimMemref(Value val) {
+  if (auto memrefTy = mlir::dyn_cast<MemRefType>(val.getType())) {
+    return memrefTy.getRank() == 1;
+  }
+  return false;
+}
+
+bool checkSubViewOffsetAndStride(memref::SubViewOp op) {
+  return isConstantIntValue(op.getMixedOffsets()[0], 0) &&
+         isConstantIntValue(op.getMixedStrides()[0], 1);
+}
+
+bool checkStride(Value val) {
+  if (auto memrefTy = mlir::dyn_cast<MemRefType>(val.getType())) {
+    return memrefTy.getRank() == 1;
+  }
+  return false;
+}
+
+void ModuleEmitter::emitMemCpyValue(Value val) {
+  if (auto castOp = val.getDefiningOp<memref::ReinterpretCastOp>()) {
+    emitValue(castOp.getSource());
+    os << "[i + ";
+    emitValue(mlir::dyn_cast<Value>(castOp.getMixedOffsets()[0]));
+    os << "]";
+  } else if (auto allocOp = val.getDefiningOp<memref::AllocOp>()) {
+    emitValue(val);
+    os << "[i]";
+  } else {
+    llvm_unreachable("mecpy unsupported subview targetOp");
+  }
+}
+
+void ModuleEmitter::emitMemCpy(memref::CopyOp op) {
+  auto sourceSubView = getSubviewOp(op.getSource());
+  auto targetSubView = getSubviewOp(op.getTarget());
+  assert(sourceSubView && targetSubView && "need copy subview");
+  assert(checkOneDimMemref(sourceSubView) && checkOneDimMemref(targetSubView) &&
+         "memcpy not support over 1D");
+  assert(checkSubViewOffsetAndStride(sourceSubView) &&
+         "source subview not support");
+  assert(checkSubViewOffsetAndStride(targetSubView) &&
+         "target subview not support");
+
+  indent() << "for (";
+  // Emit lower bound.
+  os << "int i = 0; ";
+  // Emit upper bound.
+  os << "i < ";
+  OpFoldResult upperBound = targetSubView.getMixedSizes()[0];
+  if (auto intAttr = getConstantIntValue(upperBound)) {
+    os << intAttr;
+  } else {
+    emitValue(mlir::dyn_cast<Value>(upperBound));
+  }
+  os << "; i += 1) {\n";
+  addIndent();
+  indent();
+  emitMemCpyValue(targetSubView.getSource());
+  os << " = ";
+  emitMemCpyValue(sourceSubView.getSource());
+  os << ";\n";
+  reduceIndent();
+  indent() << "}";
+  emitInfoAndNewLine(op);
+  if (mlir::isa<memref::AllocOp>(targetSubView.getSource().getDefiningOp())) {
+    indent() << "barrier(CLK_LOCAL_MEM_FENCE);\n";
+  }
 }
 
 template <typename OpType> void ModuleEmitter::emitReshape(OpType op) {
@@ -754,8 +824,8 @@ LogicalResult emitOpenCL(ModuleOp module, llvm::raw_ostream &os) {
 
 void registerEmitOpenCLTranslation() {
   static TranslateFromMLIRRegistration toOpenCL(
-      "triton-spirv-emit-opencl", "Translate MLIR into OpenCL",
-      emitOpenCL, [&](DialectRegistry &registry) {
+      "triton-spirv-emit-opencl", "Translate MLIR into OpenCL", emitOpenCL,
+      [&](DialectRegistry &registry) {
         registry.insert<mlir::math::MathDialect, mlir::arith::ArithDialect,
                         mlir::scf::SCFDialect, mlir::func::FuncDialect,
                         mlir::memref::MemRefDialect, ::mlir::gpu::GPUDialect,
